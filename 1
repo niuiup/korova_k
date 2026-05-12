@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AgriVision: Cow Monitor</title>
+    <!-- Загружаем библиотеку Roboflow Inference -->
+    <script src="https://cdn.jsdelivr.net/npm/inferencejs"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #f0f2f6; }
+        #container { position: relative; display: inline-block; margin-top: 20px; }
+        video, canvas { border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        canvas { position: absolute; left: 0; top: 0; }
+        .controls { margin: 20px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>🐄 Мониторинг коров (Browser AI)</h1>
+    <p>Модель определяет: лежит, стоит или идет</p>
+
+    <div class="controls">
+        <button id="start-btn">Включить камеру</button>
+    </div>
+
+    <div id="container">
+        <video id="video" width="640" height="480" autoplay muted playsinline></video>
+        <canvas id="canvas" width="640" height="480"></canvas>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const startBtn = document.getElementById('start-btn');
+
+        // ТВОИ ДАННЫЕ (Вставь сюда свой публичный ключ)
+        const publishableKey = "rf_JdcbYyuTJJgpq2J3lSUFBfV5jPp2"; 
+        const modelName = "cow-lie-stand-walk";
+        const modelVersion = 2;
+
+        const { InferenceEngine } = inferencejs;
+        const engine = new InferenceEngine();
+
+        async function startDetection() {
+            // 1. Запрашиваем камеру
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+
+            // 2. Загружаем модель в браузер
+            const worker = await engine.startWorker(modelName, modelVersion, publishableKey);
+
+            // 3. Цикл распознавания
+            setInterval(async () => {
+                const predictions = await worker.detect(video);
+                
+                // Очищаем канвас и рисуем рамки
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                predictions.forEach(prediction => {
+                    const { x, y, width, height, class: className, confidence } = prediction;
+                    
+                    // Рисуем прямоугольник
+                    ctx.strokeStyle = className === "cow-lie" ? "blue" : "green";
+                    ctx.lineWidth = 4;
+                    ctx.strokeRect(x - width/2, y - height/2, width, height);
+
+                    // Пишем текст
+                    ctx.fillStyle = className === "cow-lie" ? "blue" : "green";
+                    ctx.font = "18px Arial";
+                    ctx.fillText(`${className} (${Math.round(confidence * 100)}%)`, x - width/2, y - height/2 - 10);
+                });
+            }, 100); // 10 раз в секунду
+        }
+
+        startBtn.addEventListener('click', () => {
+            startDetection();
+            startBtn.innerText = "Работает...";
+            startBtn.disabled = true;
+        });
+    </script>
+</body>
+</html>
